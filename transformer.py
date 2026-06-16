@@ -68,10 +68,10 @@ class Transformer(nn.Module):
 
         num of positions = 20
         num of classes = 3
-        output layer shape after FFN (20, 3)
-
         embeddings -> positional_encoding -> TransformerLayer -> (TransformerLayer - optional) -> ... -> FFNN/Sequential
         -> return
+
+        output layer shape after FFN (20, 3)
         """
         # raise Exception("Implement me")
         embedded_input = self.word_embedding(input)
@@ -97,18 +97,20 @@ class TransformerLayer(nn.Module):
         super().__init__()
         """
         attention has shape n * d_model
-        Q and K of dimension dk, and V of dimension d
+        Q and K of dimension dk, and V of dimension dv
         
         To facilitate these residual connections, all sub-layers in the model, as well as the embedding
-        layers, produce outputs of dimension dmodel = 512.
+        layers, produce outputs of dimension dmodel = 512.(larger model and dataset)
+        
+        in this project, keep the dmodel small would prevent overfitting risk
         """
         self.g = nn.ReLU()
         self.d_model = d_model
         self.d_internal = d_internal
         self.d_k = d_model
-        self.W = nn.Linear(d_internal, d_internal)
-        self.V = nn.Linear(d_internal, d_internal)
-        self.query = nn.Linear(d_internal, d_internal)
+        self.W = nn.Linear(d_model, d_model)
+        self.V = nn.Linear(d_model, d_model)
+        self.query = nn.Linear(d_model, d_internal)
         self.key = nn.Linear(d_internal, d_internal)
         self.value = nn.Linear(d_internal, d_model)
 
@@ -120,7 +122,7 @@ class TransformerLayer(nn.Module):
         Step 4: multiply the result by the value (torch.mutmal(softmax_result, v) or softmax_result @ v) (torch.bmm?)
         """
         q_kt = torch.matmul(query, key.transpose(1, 0))
-        softmax_result = torch.nn.functional.softmax(q_kt / math.sqrt(self.d_k), dim=0)
+        softmax_result = torch.nn.functional.softmax(q_kt / math.sqrt(self.d_k), dim=-1)
         return torch.matmul(softmax_result, value)
 
     def FFNN(self, attention):
@@ -193,8 +195,8 @@ def train_classifier(args, train, dev):
     # Some suggested snippets to use:
     vocab_size = 27
     num_positions = 20
-    d_model = 3
-    d_internal = 3
+    d_model = 20
+    d_internal = 20
     num_classes = 3
     num_layers = 1
     lr = 1e-3
