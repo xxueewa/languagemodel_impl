@@ -66,6 +66,10 @@ class Transformer(nn.Module):
         :return: A tuple of the softmax log probabilities (should be a 20x3 matrix) and a list of the attention
         maps you use in your layers (can be variable length, but each should be a 20x20 matrix)
 
+        num of positions = 20
+        num of classes = 3
+        output layer shape after FFN (20, 3)
+
         embeddings -> positional_encoding -> TransformerLayer -> (TransformerLayer - optional) -> ... -> FFNN/Sequential
         -> return
         """
@@ -75,9 +79,9 @@ class Transformer(nn.Module):
         attention_list = []
         transform, attention_map = self.transform_layer.forward(encoding)
         attention_list.append(attention_map)
-        transform2, attention_map2 = self.transform_layer.forward(encoding)
-        attention_list.append(attention_map2)
-        return torch.log(self.softmax(self.V(transform2))), attention_list
+        # transform2, attention_map2 = self.transform_layer.forward(encoding)
+        # attention_list.append(attention_map2)
+        return torch.log(self.softmax(self.V(transform))), attention_list
 
 
 # Your implementation of the Transformer layer goes here. It should take vectors and return the same number of vectors
@@ -92,24 +96,21 @@ class TransformerLayer(nn.Module):
         """
         super().__init__()
         """
-        self.d_model = 
-        self.d_internal = 
-        self.query, self.key, self.value = nn.Linear(d_model, d_internal)
+        attention has shape n * d_model
+        Q and K of dimension dk, and V of dimension d
         
-        for the above. we have to use another linear layer to get from d_internal back to d_model
-        
-        Do a sequential model here with Linear -> ReLU -> Linear
-        Here the linear model will be d_model by d_model
+        To facilitate these residual connections, all sub-layers in the model, as well as the embedding
+        layers, produce outputs of dimension dmodel = 512.
         """
         self.g = nn.ReLU()
-        self.W = nn.Linear(d_internal, d_internal)
-        self.V = nn.Linear(d_internal, d_internal)
         self.d_model = d_model
         self.d_internal = d_internal
-        self.d_k = 100
-        self.query = nn.Linear(d_model, d_internal)
-        self.key = nn.Linear(d_model, d_internal)
-        self.value = nn.Linear(d_model, d_internal)
+        self.d_k = d_model
+        self.W = nn.Linear(d_internal, d_internal)
+        self.V = nn.Linear(d_internal, d_internal)
+        self.query = nn.Linear(d_internal, d_internal)
+        self.key = nn.Linear(d_internal, d_internal)
+        self.value = nn.Linear(d_internal, d_model)
 
     def attention(self, query, key, value):
         """
@@ -192,8 +193,8 @@ def train_classifier(args, train, dev):
     # Some suggested snippets to use:
     vocab_size = 27
     num_positions = 20
-    d_model = vocab_size
-    d_internal = num_positions
+    d_model = 3
+    d_internal = 3
     num_classes = 3
     num_layers = 1
     lr = 1e-3
@@ -258,7 +259,7 @@ def decode(model: Transformer, dev_examples: List[LetterCountingExample], do_pri
                 ax.set_xticks(np.arange(len(ex.input)), labels=ex.input)
                 ax.set_yticks(np.arange(len(ex.input)), labels=ex.input)
                 ax.xaxis.tick_top()
-                # plt.show()
+                plt.show()
                 plt.savefig("plots/%i_attns%i.png" % (i, j))
         acc = sum([predictions[i] == ex.output[i] for i in range(0, len(predictions))])
         num_correct += acc
