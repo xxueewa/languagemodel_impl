@@ -206,7 +206,7 @@ def train_classifier(args, train, dev):
     model.train()
     optimizer = optim.Adam(model.parameters(), lr)
 
-    num_epochs = 10
+    num_epochs = 20
     for t in range(0, num_epochs):
         loss_this_epoch = 0.0
         random.seed(t)
