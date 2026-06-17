@@ -1,0 +1,22 @@
+## Language Model Architecture Implementation
+
+### History of Language Model
+- RNN
+- Seq-to-Seq (LSTM)
+- Transformer (Attention Mechanism)
+- BERT(RoBERTa, ALBERT, DeBERTa)
+- GPT (GPT-2,3, InstructGPT, ChatGPT, GPT4,5)
+- Other (Meta → Llama, DeepSeek → DeepSeek-R1)
+
+
+### Reference
+- Transformer (https://arxiv.org/abs/1706.03762)
+- MoE (https://arxiv.org/abs/1701.06538)
+- BERT (Pre-training of Deep Bidirectional Transformers for Language Understanding)
+- InstructGPT (Training Language Models to Follow Instructions with Human Feedback)
+
+## Introduction
+In this project, I practiced the implementation of commonly used language models from scratch. 
+
+## Result
+Transformer encoder: Accuracy: 19370 / 20000 = 0.968500
