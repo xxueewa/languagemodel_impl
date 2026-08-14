@@ -256,14 +256,16 @@ def train_decoder(args, vocab_size, num_positions, train, dev):
     model.train()
     optimizer = optim.Adam(model.parameters(), lr)
 
-    num_epochs = 50
+    num_epochs = 20
     training_losses = []
     dev_losses = []
     dev_perplexities = []
     loss_fcn = nn.CrossEntropyLoss(ignore_index=-100) # ignore <PAD>
     for t in range(0, num_epochs):
         loss_this_epoch = 0.0
-        for input_tokens, target_tokens, _ in train:
+        print("Epoch %i starts " % (t + 1))
+        for batch_idx, (input_tokens, target_tokens, _) in enumerate(train):
+            print(batch_idx)
             input_tokens = input_tokens.to(device)
             target_tokens = target_tokens.to(device)
             prob, _ = model(input_tokens)
@@ -280,6 +282,14 @@ def train_decoder(args, vocab_size, num_positions, train, dev):
         dev_perplexities.append(dev_perplexity)
         print("Epoch %i: train loss = %f, dev loss = %f, dev perplexity = %f" %
               (t + 1, training_losses[-1], dev_loss, dev_perplexity))
+        if t % 5 == 0:
+            checkpoint = {
+                'epoch': t,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': training_losses[-1]
+            }
+            torch.save(checkpoint, 'checkpoint_' + t +'.pth')
         model.train()
     plt.plot(range(1, num_epochs + 1), training_losses)
     plt.plot(range(1, num_epochs + 1), dev_losses)

@@ -51,7 +51,7 @@ def _parse_args():
     parser.add_argument('--dev', type=str, default='data/lettercounting-dev.txt', help='path to dev examples')
     parser.add_argument('--output_bundle_path', type=str, default='classifier-output.json', help='path to write the results json to (you should not need to modify)')
     parser.add_argument('--max-length', type=int, default=5462, help='maximum number of characters per example')
-    parser.add_argument('--batch-size', type=int, default=64, help='training and evaluation batch size')
+    parser.add_argument('--batch-size', type=int, default=16, help='training and evaluation batch size')
     parser.add_argument('--num-workers', type=int, default=4, help='DataLoader worker processes')
     args = parser.parse_args()
     return args
