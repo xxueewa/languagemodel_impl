@@ -1,10 +1,11 @@
-# letter_counting.py
+# train_decoder_model.py
 
 import argparse
 import json
 import time
+import torch.nn as nn
 from utils import *
-from encoder_only_transformer import *
+from decoder_only_transformer import *
 import numpy as np
 
 ####################################################
@@ -74,11 +75,9 @@ if __name__ == '__main__':
     dev_exs = read_examples(args.dev)
     dev_bundles = [LetterCountingExample(l, get_letter_count_output(l, count_only_previous), vocab_index) for l in dev_exs]
 
-    model = train_classifier(args, train_bundles, dev_bundles)
-    # Decodes the first 5 dev examples to display as output
-    decode(model, dev_bundles[0:5], do_print=True, do_plot_attn=True)
-    # Decodes 100 training examples and the entire dev set (1000 examples)
-    print("Training accuracy (100 exs):")
-    decode(model, train_bundles[0:100])
-    print("Dev accuracy (whole set):")
-    decode(model, dev_bundles)
+    model = train_decoder(args, train_bundles, dev_bundles)
+    dev_loss, dev_perplexity = evaluate_language_model(
+        model, dev_bundles, nn.NLLLoss()
+    )
+    print("Final dev loss: %f" % dev_loss)
+    print("Final dev perplexity: %f" % dev_perplexity)
