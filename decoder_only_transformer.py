@@ -72,11 +72,10 @@ class Transformer(nn.Module):
         """
         # raise Exception("Implement me")
         embedded_input = self.word_embedding(input)
-        positions = torch.arange(input.size(1), device=input.device)
-        position_encoding = self.positional_encoding.forward(positions)
+        position_encoding = self.positional_encoding(embedded_input)
         embedding = embedded_input + position_encoding 
         attention_list = []
-        transform, attention_map = self.transform_layer.forward(embedding)
+        transform, attention_map = self.transform_layer(embedding)
         attention_list.append(attention_map)
         # transform2, attention_map2 = self.transform_layer.forward(transform)
         # attention_list.append(attention_map2)
@@ -112,6 +111,8 @@ class TransformerLayer(nn.Module):
         self.query = nn.Linear(d_model, d_internal)
         self.key = nn.Linear(d_internal, d_internal)
         self.value = nn.Linear(d_internal, d_model)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
 
     def attention(self, query, key, value):
         """
@@ -154,13 +155,20 @@ class TransformerLayer(nn.Module):
 
         attention = self.attention(query, key, value)
         scores = torch.matmul(query, key.transpose(-2, -1))
+        scores = scores / math.sqrt(self.d_internal)
+        
         causal_mask = torch.triu(
             torch.ones_like(scores, dtype=torch.bool), diagonal=1
         )
         attention_map = torch.nn.functional.softmax(
-            scores.masked_fill(causal_mask, float("-inf")) / math.sqrt(self.d_k), dim=-1
+            scores.masked_fill(causal_mask, float("-inf")), dim=-1
         )
-        return self.FFNN(attention), attention_map
+        attention_output = attention_map @ value
+
+        hidden = self.norm1(input_vecs + attention_output)
+        output = self.norm2(hidden + self.FFNN(hidden))
+
+        return output, attention_map
 
 
 # Implementation of positional encoding that you can use in your network
@@ -185,8 +193,14 @@ class PositionalEncoding(nn.Module):
         :return: a tensor of the same size with positional embeddings added in
         """
         # Second-to-last dimension will always be sequence length
+        seq_len = x.size(1)
         input_size = x.shape[-2]
-        indices_to_embed = torch.tensor(np.asarray(range(0, input_size))).type(torch.LongTensor)
+        # indices_to_embed = torch.tensor(np.asarray(range(0, input_size))).type(torch.LongTensor)
+        indices_to_embed = torch.arange(
+            seq_len,
+            device=x.device,
+            dtype=torch.long,
+        )
         if self.batched:
             # Use unsqueeze to form a [1, seq len, embedding dim] tensor -- broadcasting will ensure that this
             # gets added correctly across the batch
@@ -229,8 +243,8 @@ def train_decoder(args, vocab_size, num_positions, train, dev):
 
     # The following code DOES NOT WORK but can be a starting point for your implementation
     # Some suggested snippets to use:
-    vocab_size = 1000
-    num_positions = 0
+    vocab_size = vocab_size
+    num_positions = num_positions
     d_model = 20
     d_internal = 20
     num_classes = vocab_size
