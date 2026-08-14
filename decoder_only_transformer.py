@@ -265,7 +265,8 @@ def train_decoder(args, vocab_size, num_positions, train, dev):
         loss_this_epoch = 0.0
         print("Epoch %i starts " % (t + 1))
         for batch_idx, (input_tokens, target_tokens, _) in enumerate(train):
-            print(batch_idx)
+            if batch_idx % 10000 == 0:
+                print(batch_idx)
             input_tokens = input_tokens.to(device)
             target_tokens = target_tokens.to(device)
             prob, _ = model(input_tokens)
@@ -289,8 +290,8 @@ def train_decoder(args, vocab_size, num_positions, train, dev):
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': training_losses[-1]
             }
-            torch.save(checkpoint, 'checkpoint_' + t +'.pth')
-        model.train()
+            torch.save(checkpoint, 'models/decoder/checkpoint_' + t +'.pth')
+
     plt.plot(range(1, num_epochs + 1), training_losses)
     plt.plot(range(1, num_epochs + 1), dev_losses)
     plt.xlabel("Epoch")
@@ -311,19 +312,40 @@ def train_decoder(args, vocab_size, num_positions, train, dev):
 
 
 def evaluate_language_model(model, examples, loss_fcn):
+    was_training = model.training
     model.eval()
     total_loss = 0.0
     num_tokens = 0
 
+    # nn.Module does not define a `.device` attribute. Infer the device from
+    # the model state and verify that parameters and buffers were moved
+    # together.
+    model_tensors = list(model.parameters()) + list(model.buffers())
+    if not model_tensors:
+        raise ValueError("Cannot infer the device of a model with no parameters or buffers")
+    model_devices = {tensor.device for tensor in model_tensors}
+    if len(model_devices) != 1:
+        raise RuntimeError(f"Model tensors are on multiple devices: {model_devices}")
+    device = next(iter(model_devices))
+
+    # This matters when the loss contains tensors, such as class weights.
+    loss_fcn = loss_fcn.to(device)
+    print("Start evaluation ...")
     with torch.no_grad():
-        for input_tokens, target_tokens, _ in examples:
+        for batch_idx, (input_tokens, target_tokens, _) in enumerate(examples):
+            print(batch_idx)
+            input_tokens = input_tokens.to(device)
+            target_tokens = target_tokens.to(device)
             log_probs, _ = model(input_tokens)
             flat_log_probs = log_probs.reshape(-1, log_probs.size(-1))
             flat_targets = target_tokens.reshape(-1)
             batch_tokens = flat_targets.ne(-100).sum().item()
+            if batch_tokens == 0:
+                continue
             total_loss += loss_fcn(flat_log_probs, flat_targets).item() * batch_tokens
             num_tokens += batch_tokens
 
     mean_loss = total_loss / num_tokens if num_tokens else 0.0
     perplexity = math.exp(mean_loss) if num_tokens else float("inf")
+    model.train(was_training)
     return mean_loss, perplexity
