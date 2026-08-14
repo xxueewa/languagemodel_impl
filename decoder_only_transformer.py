@@ -22,14 +22,6 @@ Fluent text generation
 # of it (output_tensor).
 # Per the task definition, the outputs are 0, 1, or 2 based on whether the character occurs 0, 1, or 2 or more
 # times previously in the input sequence (not counting the current occurrence).
-class LetterCountingExample(object):
-    def __init__(self, input: str, output: np.array, vocab_index: Indexer):
-        self.input = input
-        self.input_indexed = np.array([vocab_index.index_of(ci) for ci in input])
-        self.input_tensor = torch.LongTensor(self.input_indexed)
-        self.output = output
-        self.output_tensor = torch.LongTensor(self.output)
-
 
 # Should contain your overall Transformer implementation. You will want to use Transformer layer to implement
 # a single layer of the Transformer; this Module will take the raw words as input and do all the steps necessary
@@ -202,24 +194,6 @@ class PositionalEncoding(nn.Module):
             return x + self.emb(indices_to_embed)
 
 
-def evaluate_language_model(model, examples, loss_fcn):
-    model.eval()
-    total_loss = 0.0
-    num_tokens = 0
-
-    with torch.no_grad():
-        for ex in examples:
-            input_tokens = ex.input_tensor[:-1]
-            target_tokens = ex.input_tensor[1:]
-            log_probs, _ = model(input_tokens)
-            total_loss += loss_fcn(log_probs, target_tokens).item() * target_tokens.numel()
-            num_tokens += target_tokens.numel()
-
-    mean_loss = total_loss / num_tokens if num_tokens else 0.0
-    perplexity = math.exp(mean_loss) if num_tokens else float("inf")
-    return mean_loss, perplexity
-
-
 # This is a skeleton for train_decider: you can implement this however you want
 def train_decoder(args, train, dev):
     # raise Exception("Not fully implemented yet")
@@ -243,20 +217,19 @@ def train_decoder(args, train, dev):
     training_losses = []
     dev_losses = []
     dev_perplexities = []
-    loss_fcn = nn.CrossEntropyLoss()
+    loss_fcn = nn.CrossEntropyLoss(ignore_index=-100) # ignore <PAD>
     for t in range(0, num_epochs):
         loss_this_epoch = 0.0
         random.seed(t)
         # You can use batching if you'd like
-        ex_idxs = [i for i in range(0, len(train))]
-        random.shuffle(ex_idxs)
-        for ex_idx in ex_idxs:
-            ex = train[ex_idx]
-            input_tokens = ex.input_tensor[:-1]
-            target_tokens = ex.input_tensor[1:]
+        # ex_idxs = [i for i in range(0, len(train))]
+        # random.shuffle(ex_idxs)
+        for input_tokens, target_tokens in train:
             prob, _ = model(input_tokens)
-            loss = loss_fcn(prob, target_tokens)
+            loss = loss_fcn(prob.reshape(-1, prob.size(-1)), target_tokens.reshape(-1))
             model.zero_grad()
+            # all model parameters
+            # optimizer.zero_grad() clears gradients only for parameters managed by that optimizer.
             loss.backward()
             optimizer.step()
             loss_this_epoch += loss.item()
@@ -285,40 +258,18 @@ def train_decoder(args, train, dev):
     model.eval()
     return model
 
-def decode(model: Transformer, dev_examples: List[LetterCountingExample], do_print=False, do_plot_attn=False):
-    """
-    Decodes the given dataset, does plotting and printing of examples, and prints the final accuracy.
-    :param model: your Transformer that returns log probabilities at each position in the input
-    :param dev_examples: the list of LetterCountingExample
-    :param do_print: True if you want to print the input/gold/predictions for the examples, false otherwise
-    :param do_plot_attn: True if you want to write out plots for each example, false otherwise
-    :return:
-    """
-    num_correct = 0
-    num_total = 0
-    if len(dev_examples) > 100:
-        print("Decoding on a large number of examples (%i); not printing or plotting" % len(dev_examples))
-        do_print = False
-        do_plot_attn = False
-    for i in range(0, len(dev_examples)):
-        ex = dev_examples[i]
-        (log_probs, attn_maps) = model.forward(ex.input_tensor)
-        predictions = np.argmax(log_probs.detach().numpy(), axis=1)
-        if do_print:
-            print("INPUT %i: %s" % (i, ex.input))
-            print("GOLD %i: %s" % (i, repr(ex.output.astype(dtype=int))))
-            print("PRED %i: %s" % (i, repr(predictions)))
-        if do_plot_attn:
-            for j in range(0, len(attn_maps)):
-                attn_map = attn_maps[j]
-                fig, ax = plt.subplots()
-                im = ax.imshow(attn_map.detach().numpy(), cmap='hot', interpolation='nearest')
-                ax.set_xticks(np.arange(len(ex.input)), labels=ex.input)
-                ax.set_yticks(np.arange(len(ex.input)), labels=ex.input)
-                ax.xaxis.tick_top()
-                plt.show()
-                plt.savefig("plots/%i_attns%i.png" % (i, j))
-        acc = sum([predictions[i] == ex.output[i] for i in range(0, len(predictions))])
-        num_correct += acc
-        num_total += len(predictions)
-    print("Accuracy: %i / %i = %f" % (num_correct, num_total, float(num_correct) / num_total))
+
+def evaluate_language_model(model, examples, loss_fcn):
+    model.eval()
+    total_loss = 0.0
+    num_tokens = 0
+
+    with torch.no_grad():
+        for input_tokens, target_tokens in examples:
+            log_probs, _ = model(input_tokens)
+            total_loss += loss_fcn(log_probs, target_tokens).item() * target_tokens.numel()
+            num_tokens += target_tokens.numel()
+
+    mean_loss = total_loss / num_tokens if num_tokens else 0.0
+    perplexity = math.exp(mean_loss) if num_tokens else float("inf")
+    return mean_loss, perplexity

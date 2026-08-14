@@ -7,11 +7,30 @@ import torch.nn as nn
 from utils import *
 from decoder_only_transformer import *
 import numpy as np
+from datasets import load_dataset
+from torch.utils.data import Dataset, DataLoader
+import re
+from torch.nn.utils.rnn import pad_sequence
 
 ####################################################
 # DO NOT MODIFY THIS FILE IN YOUR FINAL SUBMISSION #
 ####################################################
 
+class DecoderDataset(Dataset):
+    def __init__(self, rows, char_to_idx):
+        self.rows = rows
+        self.char_to_idx = char_to_idx
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __getitem__(self, index):
+        text = self.rows[index]["text"]
+        tokens = torch.tensor(
+            [self.char_to_idx[c] for c in text],
+            dtype=torch.long,
+        )
+        return tokens[:-1], tokens[1:]
 
 def _parse_args():
     """
@@ -54,14 +73,14 @@ def get_letter_count_output(input: str, count_only_previous: bool=True) -> np.ar
             output[i] = min(2, len([c for c in input if c == input[i]]) - 1)  # count all *other* instances of input[i]
     return output
 
-
 if __name__ == '__main__':
     start_time = time.time()
     args = _parse_args()
     print(args)
 
     # Constructs the vocabulary: lowercase letters a to z and space
-    vocab = [chr(ord('a') + i) for i in range(0, 26)] + [' ']
+    number = [chr(ord('0') + i) for i in range(0, 10)]
+    vocab = [chr(ord('a') + i) for i in range(0, 26)] + [' '] + number
     vocab_index = Indexer()
     for char in vocab:
         vocab_index.add_and_get_index(char)
@@ -69,15 +88,38 @@ if __name__ == '__main__':
 
     count_only_previous = True if args.task == "BEFORE" else False
 
-    # Constructs and labels the data
-    train_exs = read_examples(args.train)
-    train_bundles = [LetterCountingExample(l, get_letter_count_output(l, count_only_previous), vocab_index) for l in train_exs]
-    dev_exs = read_examples(args.dev)
-    dev_bundles = [LetterCountingExample(l, get_letter_count_output(l, count_only_previous), vocab_index) for l in dev_exs]
+    # construct the dataloader
+    data_set = load_dataset("roneneldan/TinyStories")
+    train_set = data_set["train"]
+    validate_set = data_set["validation"]
 
-    model = train_decoder(args, train_bundles, dev_bundles)
+    char_to_idx = {
+        char: vocab_index.index_of(char)
+        for char in vocab
+    }
+
+    train_dataset = DecoderDataset(train_set, char_to_idx)
+    validate_dataset = DecoderDataset(validate_set, char_to_idx)
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=64,
+        shuffle=True,
+        num_workers=4,
+        persistent_workers=True
+    )
+
+    dev_loader = DataLoader(
+        validate_dataset,
+        batch_size=64,
+        shuffle=True,
+        num_workers=4,
+        persistent_workers=True     
+    )
+
+    model = train_decoder(args, train_loader, dev_loader)
     dev_loss, dev_perplexity = evaluate_language_model(
-        model, dev_bundles, nn.NLLLoss()
+        model, dev_loader, nn.NLLLoss()
     )
     print("Final dev loss: %f" % dev_loss)
     print("Final dev perplexity: %f" % dev_perplexity)
