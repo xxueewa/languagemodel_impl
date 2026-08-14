@@ -118,7 +118,7 @@ class TransformerLayer(nn.Module):
         Step 3: apply a softmax to the result (torch.nn.functional.softmax)
         Step 4: multiply the result by the value (torch.mutmal(softmax_result, v) or softmax_result @ v) (torch.bmm?)
         """
-        q_kt = torch.matmul(query, key.transpose(1, 0))
+        q_kt = torch.matmul(query, key.transpose(-2, -1))
         causal_mask = torch.triu(
             torch.ones_like(q_kt, dtype=torch.bool), diagonal=1
         )
@@ -151,7 +151,7 @@ class TransformerLayer(nn.Module):
         value = self.value(input_vecs)
 
         attention = self.attention(query, key, value)
-        scores = torch.matmul(query, key.transpose(1, 0))
+        scores = torch.matmul(query, key.transpose(-2, -1))
         causal_mask = torch.triu(
             torch.ones_like(scores, dtype=torch.bool), diagonal=1
         )
@@ -200,8 +200,8 @@ def train_decoder(args, train, dev):
 
     # The following code DOES NOT WORK but can be a starting point for your implementation
     # Some suggested snippets to use:
-    vocab_size = 27
-    num_positions = 20
+    vocab_size = args.vocab_size
+    num_positions = args.num_positions
     d_model = 20
     d_internal = 20
     num_classes = vocab_size
@@ -224,7 +224,7 @@ def train_decoder(args, train, dev):
         # You can use batching if you'd like
         # ex_idxs = [i for i in range(0, len(train))]
         # random.shuffle(ex_idxs)
-        for input_tokens, target_tokens in train:
+        for input_tokens, target_tokens, _ in train:
             prob, _ = model(input_tokens)
             loss = loss_fcn(prob.reshape(-1, prob.size(-1)), target_tokens.reshape(-1))
             model.zero_grad()
@@ -265,10 +265,13 @@ def evaluate_language_model(model, examples, loss_fcn):
     num_tokens = 0
 
     with torch.no_grad():
-        for input_tokens, target_tokens in examples:
+        for input_tokens, target_tokens, _ in examples:
             log_probs, _ = model(input_tokens)
-            total_loss += loss_fcn(log_probs, target_tokens).item() * target_tokens.numel()
-            num_tokens += target_tokens.numel()
+            flat_log_probs = log_probs.reshape(-1, log_probs.size(-1))
+            flat_targets = target_tokens.reshape(-1)
+            batch_tokens = flat_targets.ne(-100).sum().item()
+            total_loss += loss_fcn(flat_log_probs, flat_targets).item() * batch_tokens
+            num_tokens += batch_tokens
 
     mean_loss = total_loss / num_tokens if num_tokens else 0.0
     perplexity = math.exp(mean_loss) if num_tokens else float("inf")

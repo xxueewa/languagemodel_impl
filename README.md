@@ -18,5 +18,10 @@
 ## Introduction
 In this project, I practiced the implementation of commonly used language models from scratch. 
 
+
 ## Result
-Transformer encoder: Accuracy: 19370 / 20000 = 0.968500
+Encoder-only model: Accuracy: 19370 / 20000 = 0.968500 
+![Alt Text](./plots/training_loss.png)
+Decoder-only model
+![Alt Text](./plots/Decoder_loss.png)
+![Alt Text](./plots/Decoder_test.png)
