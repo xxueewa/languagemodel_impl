@@ -52,7 +52,7 @@ def _parse_args():
     parser.add_argument('--output_bundle_path', type=str, default='classifier-output.json', help='path to write the results json to (you should not need to modify)')
     parser.add_argument('--max-length', type=int, default=5462, help='maximum number of characters per example')
     parser.add_argument('--batch-size', type=int, default=64, help='training and evaluation batch size')
-    parser.add_argument('--num-workers', type=int, default=0, help='DataLoader worker processes')
+    parser.add_argument('--num-workers', type=int, default=4, help='DataLoader worker processes')
     args = parser.parse_args()
     return args
 
@@ -130,8 +130,8 @@ if __name__ == '__main__':
     train_dataset = DecoderDataset(train_set, char_to_idx, args.max_length)
     validate_dataset = DecoderDataset(validate_set, char_to_idx, args.max_length)
 
-    args.vocab_size = len(char_to_idx)
-    args.num_positions = args.max_length - 1
+    vocab_size = len(char_to_idx)
+    num_positions = args.max_length - 1
     collate_fn = partial(collate_decoder_batch, pad_idx=pad_idx)
 
     train_loader = DataLoader(
@@ -152,7 +152,7 @@ if __name__ == '__main__':
         collate_fn=collate_fn,
     )
     print("Start training ...")
-    model = train_decoder(args, train_loader, dev_loader)
+    model = train_decoder(args, vocab_size, num_positions, train_loader, dev_loader)
     dev_loss, dev_perplexity = evaluate_language_model(
         model, dev_loader, nn.NLLLoss()
     )

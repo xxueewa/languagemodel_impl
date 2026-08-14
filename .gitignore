@@ -2,3 +2,4 @@ __pycache__/
 .idea
 myenv
 .DS_Store
+__pycache__/utils.cpython-311.pyc

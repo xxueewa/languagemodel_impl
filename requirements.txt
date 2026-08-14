@@ -3,3 +3,5 @@ numpy
 scipy
 torchvision
 transformers
+matplotlib
+datasets

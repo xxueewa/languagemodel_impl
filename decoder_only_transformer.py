@@ -72,11 +72,13 @@ class Transformer(nn.Module):
         """
         # raise Exception("Implement me")
         embedded_input = self.word_embedding(input)
-        encoding = self.positional_encoding.forward(embedded_input)
+        positions = torch.arange(input.size(1), device=input.device)
+        position_encoding = self.positional_encoding.forward(positions)
+        embedding = embedded_input + position_encoding 
         attention_list = []
-        transform, attention_map = self.transform_layer.forward(encoding)
+        transform, attention_map = self.transform_layer.forward(embedding)
         attention_list.append(attention_map)
-        # transform2, attention_map2 = self.transform_layer.forward(encoding)
+        # transform2, attention_map2 = self.transform_layer.forward(transform)
         # attention_list.append(attention_map2)
         return torch.nn.functional.log_softmax(self.V(transform), dim=-1), attention_list
 
@@ -195,20 +197,47 @@ class PositionalEncoding(nn.Module):
 
 
 # This is a skeleton for train_decider: you can implement this however you want
-def train_decoder(args, train, dev):
+def train_decoder(args, vocab_size, num_positions, train, dev):
     # raise Exception("Not fully implemented yet")
+
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")  # For Mac M1/M2/M3 chips
+    else:
+        device = torch.device("cpu")
+
+    print(f"Device Type: {device.type}")
+
+    if device.type == "mps":
+        if torch.backends.mps.is_available():
+            print("Status:      MPS is available and active.")
+            print("Hardware:    Apple Silicon GPU (Unified Memory)")
+            
+            # Check current memory allocated by PyTorch on MPS
+            allocated_mem = torch.mps.current_allocated_memory() / 1024**2
+            print(f"VRAM Used:   {allocated_mem:.2f} MB (allocated by PyTorch)")
+        else:
+            print("Status:      MPS device targeted, but MPS is NOT available on this system.")
+    elif device.type == "cuda":
+        if torch.cuda.is_available():
+            props = torch.cuda.get_device_properties(device)
+            print(f"Name:        {props.name}")
+            print(f"Total VRAM:  {props.total_memory / 1024**3:.2f} GB")
+        else:
+            print("CUDA is not available.")
 
     # The following code DOES NOT WORK but can be a starting point for your implementation
     # Some suggested snippets to use:
-    vocab_size = args.vocab_size
-    num_positions = args.num_positions
+    vocab_size = 1000
+    num_positions = 0
     d_model = 20
     d_internal = 20
     num_classes = vocab_size
     num_layers = 1
     lr = 1e-3
 
-    model = Transformer(vocab_size, num_positions, d_model, d_internal, num_classes, num_layers)
+    model = Transformer(vocab_size, num_positions, d_model, d_internal, num_classes, num_layers).to(device)
     model.zero_grad()
     model.train()
     optimizer = optim.Adam(model.parameters(), lr)
@@ -220,15 +249,13 @@ def train_decoder(args, train, dev):
     loss_fcn = nn.CrossEntropyLoss(ignore_index=-100) # ignore <PAD>
     for t in range(0, num_epochs):
         loss_this_epoch = 0.0
-        random.seed(t)
-        # You can use batching if you'd like
-        # ex_idxs = [i for i in range(0, len(train))]
-        # random.shuffle(ex_idxs)
         for input_tokens, target_tokens, _ in train:
+            input_tokens = input_tokens.to(device)
+            target_tokens = target_tokens.to(device)
             prob, _ = model(input_tokens)
             loss = loss_fcn(prob.reshape(-1, prob.size(-1)), target_tokens.reshape(-1))
             model.zero_grad()
-            # all model parameters
+            # mode.zero_grad() clears gradients for all model parameters
             # optimizer.zero_grad() clears gradients only for parameters managed by that optimizer.
             loss.backward()
             optimizer.step()
