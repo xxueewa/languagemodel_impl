@@ -256,7 +256,7 @@ def train_decoder(args, vocab_size, num_positions, train, dev):
     model.train()
     optimizer = optim.Adam(model.parameters(), lr)
 
-    num_epochs = 20
+    num_epochs = 5
     training_losses = []
     dev_losses = []
     dev_perplexities = []
@@ -290,7 +290,7 @@ def train_decoder(args, vocab_size, num_positions, train, dev):
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': training_losses[-1]
             }
-            torch.save(checkpoint, 'models/decoder/checkpoint_' + t +'.pth')
+            torch.save(checkpoint, f"models/decoder/checkpoint_{t}.pth")
 
     plt.plot(range(1, num_epochs + 1), training_losses)
     plt.plot(range(1, num_epochs + 1), dev_losses)
