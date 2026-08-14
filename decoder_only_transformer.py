@@ -333,7 +333,8 @@ def evaluate_language_model(model, examples, loss_fcn):
     print("Start evaluation ...")
     with torch.no_grad():
         for batch_idx, (input_tokens, target_tokens, _) in enumerate(examples):
-            print(batch_idx)
+            if batch_idx % 100 == 0:
+                print(batch_idx)
             input_tokens = input_tokens.to(device)
             target_tokens = target_tokens.to(device)
             log_probs, _ = model(input_tokens)
