@@ -9,6 +9,7 @@ from torch import optim
 import matplotlib.pyplot as plt
 from typing import List
 from utils import *
+from pathlib import Path
 
 """
 GPT
@@ -251,6 +252,8 @@ def train_decoder(args, vocab_size, num_positions, train, dev):
     num_layers = 1
     lr = 1e-3
 
+    model_dir = Path(__file__).resolve().parent / "models" / "decoder"
+
     model = Transformer(vocab_size, num_positions, d_model, d_internal, num_classes, num_layers).to(device)
     model.zero_grad()
     model.train()
@@ -290,7 +293,7 @@ def train_decoder(args, vocab_size, num_positions, train, dev):
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': training_losses[-1]
             }
-            torch.save(checkpoint, f"models/decoder/checkpoint_{t}.pth")
+            torch.save(checkpoint, model_dir / f"checkpoint_{t}.pth")
 
     plt.plot(range(1, num_epochs + 1), training_losses)
     plt.plot(range(1, num_epochs + 1), dev_losses)
