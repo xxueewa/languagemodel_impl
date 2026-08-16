@@ -210,6 +210,19 @@ class PositionalEncoding(nn.Module):
         else:
             return x + self.emb(indices_to_embed)
 
+def get_model_size():
+    d_model = 20
+    d_internal = 20
+    num_classes = 37
+    num_layers = 1
+    model = Transformer(37, 5000, d_model, d_internal, 3, num_layers)
+
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    print(f"总参数量: {total_params}, 可训练参数量: {trainable_params}")
+
+
 
 # This is a skeleton for train_decider: you can implement this however you want
 def train_decoder(args, vocab_size, num_positions, train, dev):
@@ -353,3 +366,6 @@ def evaluate_language_model(model, examples, loss_fcn):
     perplexity = math.exp(mean_loss) if num_tokens else float("inf")
     model.train(was_training)
     return mean_loss, perplexity
+
+if __name__=='__main__':
+    get_model_size()
